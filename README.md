@@ -1,43 +1,28 @@
-# 云吞插件模板
+# 信息面板（Glance）
 
-开发流程见[插件开发指南](https://github.com/wontonapp/wonton-docs/blob/main/develop.md)。
+打开一个页面就能看到天气、日历、时间和新闻，像钉在墙上的信息板。装好后从侧边栏的“面板”打开就能用，不用注册登录。
 
-这是一个能安装的示例插件 `app.example.hello`：使用 nginx 官方镜像显示问候页，经网关的 `sso: proxy` 注入用户名，页面显示“你好，<用户名>”。示例没有应用账号、持久化数据或 MCP 工具。
+默认页面左边是天气、时钟和日历，右边是资讯（少数派、阮一峰的网络日志、36氪、Hacker News）和 GitHub 仓库动态。
 
-## 示例文件
+## 页面上放什么由你定
 
-| 路径 | 内容 |
-| --- | --- |
-| `docker-compose.yml` | 示例清单、nginx 服务和三个 `configs` |
-| `web/default.conf.template` | nginx 配置，启用 SSI 回显用户名并提供健康检查入口；只放行来自核心地址（`${WONTON_CORE_ADDRESS}`）的请求，其余来源 403 |
-| `web/index.html` | 问候页 |
-| `web/tokens.css` | 页面主题变量的后备值 |
-| `tabs/` | 示例主页的应用页面图标 |
-| `screenshots/home.png` | 商店详情页的示例截图 |
-| `scripts/smoke-probes.sh` | 检查真实页面和网关注入身份的插件探针 |
+- **天气城市**：详情页的“设置”里改，写“城市, 国家”（如“上海, 中国”）；改完面板自动换。
+- **小时制、温度单位**：也在设置里。
+- **换部件**：面板上显示什么由配置文件决定。数据目录就是 Glance 的配置目录，里面有 `glance.yml`（页面结构）和 `widgets/`（部件），改完保存，一般马上生效；没生效就到详情页停止再启动。全部部件（股票、监控、待办、Docker 状态……）和写法见[上游配置文档](https://github.com/glanceapp/glance/blob/v0.8.8/docs/configuration.md)。
 
-从模板创建自己的插件后，替换示例清单、网页和素材；具体步骤见[写插件](https://github.com/wontonapp/wonton-docs/blob/main/develop.md#写插件)。
+## 数据在哪
 
-## 对着别的栈跑探针
+数据目录：`.wonton/data/apps/<插件 id>/`。里面只有配置文件，面板显示的新闻、天气都是从网上现拉的，不存数据。卸载时选“删除数据”会删掉你改过的配置。
 
-`probes`、`api`、`session` 按 `.wonton/.env` 的 `WONTON_BASE_DOMAIN` 拼核心地址，`up` 起的栈自己写这个键。插件装进别人的栈、或者对着已有环境排查时，把那套栈的基础域名写进 `.wonton/.env`，不要只按实例名猜地址：实例名只是资源名前缀，网关按 Host 认域名，拼错了会回“没有安装”。
+## 已知限制
 
-```bash
-WONTON_BASE_DOMAIN=wonton.localhost
-```
-
-## 核心镜像
-
-检查和冒烟默认用套件里的核心镜像（`ghcr.io/wontonapp/wonton-core:main`）；要固定别的核心镜像，在仓库 Settings → Variables 设 `WONTON_CORE_IMAGE`，手动触发“检查”时填的 `core-image` 输入优先。
-
-## 更新开发套件
-
-```bash
-scripts/dev.sh kit-update
-```
-
-在从模板新建的插件仓库中更新套件；本仓库是套件源头，执行时只提示并退出。版本、可选引用和自定义脚本约定见[开发指南](https://github.com/wontonapp/wonton-docs/blob/main/develop.md#更新开发套件)。
+- 配置是文件，云吞 App 里还没有编辑配置文件的入口：改部件需要主人或 Agent 直接改数据目录里的文件（天气城市、小时制这些常用项不用，设置里就能改）。
+- RSS 源列表做不成设置（设置没有自由列表的控件）：加、减 RSS 源要改 `glance.yml` 里的 `feeds`。
+- 天气、新闻、GitHub 动态都要能访问外网。
+- 想看知乎热榜、微博热搜这类没有 RSS 的内容，要再装一个 RSSHub（把没有 RSS 的网站变成 RSS）。本插件第一版没有接：商店里还没有提供这个能力的插件；等有了，RSSHub 里加源的方式是在 `glance.yml` 的 `feeds` 里填 `http://<能力名>.wonton.internal:1200/<路由>` 一类的地址。
+- GitHub 部件不填令牌时，GitHub 匿名限额是每小时 60 次（按出口 IP 算）。默认页只放了一个部件，一般够用；多加这类部件或把缓存调小可能碰到限额，那时可以用自己的 GitHub 只读令牌（部件的 `token` 项）。
+- 界面没有中文选项：部件标题等文字都是你自己在配置里写的（默认页已用中文），应用自带的按钮等仍是英文。
 
 ## 图标
 
-`icon.svg` 是本仓库原创线条图标，按本仓库 MIT 许可证分发，见 [NOTICE](NOTICE)。
+图标来自 [glanceapp/glance](https://github.com/glanceapp/glance) 官方标志，来源、版权和许可见 [NOTICE](NOTICE)。
