@@ -6,9 +6,11 @@ pages:
     columns:
       - size: small
         widgets:
-          # 天气部件由插件的 init 服务生成：设置里填了“天气城市”就有天气，没填就只剩注释、不显示。
-          # 城市值来自设置，经 GLANCE_WEATHER_* 环境变量在启动时替换进来。
-          - $include: widgets/weather.yml
+          # 城市等值来自设置（核心设置上线前用 compose 里的默认值“北京, 中国”），经环境变量在启动时替换。
+          - type: weather
+            location: ${GLANCE_WEATHER_CITY}
+            units: ${GLANCE_WEATHER_UNITS}
+            hour-format: ${GLANCE_WEATHER_HOUR_FORMAT}
           - type: clock
             hour-format: ${GLANCE_HOUR_FORMAT}
           - type: calendar
