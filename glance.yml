@@ -6,7 +6,8 @@ pages:
     columns:
       - size: small
         widgets:
-          # 城市等值来自设置（核心设置上线前用 compose 里的默认值“北京, 中国”），经环境变量在启动时替换。
+          # 城市等值来自设置（核心设置上线前用 compose 里的默认值），经环境变量在启动时替换。
+          # 地名用英文：glance 检索 open-meteo 固定 language=en，中文地名查不到。
           - type: weather
             location: ${GLANCE_WEATHER_CITY}
             units: ${GLANCE_WEATHER_UNITS}
