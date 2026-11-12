@@ -9,18 +9,21 @@ pages:
           # 城市等值来自设置（核心设置上线前用 compose 里的默认值），经环境变量在启动时替换。
           # 地名用英文：glance 检索 open-meteo 固定 language=en，中文地名查不到。
           - type: weather
+            title: 天气
             location: ${GLANCE_WEATHER_CITY}
             units: ${GLANCE_WEATHER_UNITS}
             hour-format: ${GLANCE_WEATHER_HOUR_FORMAT}
           - type: clock
+            title: 时钟
             hour-format: ${GLANCE_HOUR_FORMAT}
           - type: calendar
+            title: 日历
       - size: full
         widgets:
           - type: group
-            title: 资讯
             widgets:
               - type: rss
+                title: 新闻
                 limit: 25
                 collapse-after: 10
                 feeds:
@@ -35,6 +38,7 @@ pages:
                 collapse-after: 8
           - type: repository
             # 想盯别的仓库就改这一行（owner/仓库名）。不填 token 时 GitHub 匿名限额每小时 60 次，部件有缓存，一个够用。
+            title: GitHub 仓库
             repository: glanceapp/glance
             pull-requests-limit: 3
             issues-limit: 3
