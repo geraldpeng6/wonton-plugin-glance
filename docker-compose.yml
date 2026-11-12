@@ -1,78 +1,101 @@
-# 示例插件：nginx 显示一个网页，向登录的人问好。改成自己的应用见 https://github.com/wontonapp/wonton-docs/blob/main/develop.md#写插件。
+# Glance 信息面板：一个页面看天气、日历、时钟、新闻和 RSS。
+# 上游 glanceapp/glance，AGPL-3.0-only，镜像按清单列表（index）的摘要固定。
+#
+# glance 只有文件配置，没有网页设置页：数据目录就是它的配置目录（容器里 /app/config），
+# 主人或 Agent 改里面的 glance.yml 就能换部件；glance 检测到文件变化会自动重载，
+# 检测不可用（inotify 受限）时在详情页停止再启动也一样。
+# 包里的默认配置由一次性服务在首次安装时复制进数据目录，已有不覆盖，用户和 Agent 改过的才能留下；
+# configs 注入的文件默认 0444，用 install -m 0644 落盘，主人和 Agent 才能改数据目录里的这份。
+# 天气城市等设置经 glance 的 ${ENV} 配置替换生效；核心的设置（wonton-core#242）上线前变量不注入，
+# compose 里 ${VAR:-默认值} 的默认值生效（默认 "Beijing, China"）。
 services:
-  web:
-    # 镜像按摘要固定（多架构镜像写清单列表的摘要），标签只给人看。
-    image: nginx:1.31.8-alpine@sha256:713fc2ebfd92e8217db451477182ee91944b123d2b1ee9fd5a8c6e91ca6c3a11
-    environment:
-      # 网关代登录：SSI 回显的 Remote-User 只信核心带来的。官方镜像启动时对 templates 目录里的
-      # *.template 做 envsubst，把下面的地址换进 nginx 配置（见 web/default.conf.template）。
-      WONTON_CORE_ADDRESS: ${WONTON_CORE_ADDRESS}
-    # 包里的文件经 configs 交给容器（核心在启动前写进去），不能用卷挂载。
+  init:
+    image: glanceapp/glance:v0.8.8@sha256:4d7445bc7971836858ffddee5d7501f1efbabb6e694a45b1dde1a789bb1943bb
+    user: "${PUID}:${PGID}"
+    entrypoint: ["/bin/sh", "-c", "test -f /data/glance.yml || install -m 0644 /seed/glance.yml /data/glance.yml"]
+    volumes:
+      - ${WONTON_APP_DATA}:/data
     configs:
-      - source: site
-        target: /etc/nginx/templates/default.conf.template
-      - source: page
-        target: /usr/share/nginx/html/index.html
-      - source: tokens
-        target: /usr/share/nginx/html/tokens.css
+      - source: glance-config
+        target: /seed/glance.yml
+    network_mode: none
+    restart: "no"
+
+  glance:
+    image: glanceapp/glance:v0.8.8@sha256:4d7445bc7971836858ffddee5d7501f1efbabb6e694a45b1dde1a789bb1943bb
+    user: "${PUID}:${PGID}"
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ}
+      # 设置值经 glance 的 ${ENV} 配置替换进页面（首页的天气和时钟引用这些变量）。
+      # 核心的设置（wonton-core#242）上线前变量不注入，冒号后的默认值生效；设置页可用后，
+      # 改设置会重建容器，新值随之生效（清空设置时核心回到 Schema 里的默认值，和这里的取值一致）。
+      GLANCE_WEATHER_CITY: ${WONTON_SETTING_CITY:-Beijing, China}
+      GLANCE_WEATHER_UNITS: ${WONTON_SETTING_UNITS:-metric}
+      GLANCE_WEATHER_HOUR_FORMAT: ${WONTON_SETTING_HOUR_FORMAT:-24h}
+      GLANCE_HOUR_FORMAT: ${WONTON_SETTING_HOUR_FORMAT:-24h}
+    volumes:
+      - ${WONTON_APP_DATA}:/app/config
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
       interval: 30s
       timeout: 5s
       start_period: 30s
       start_interval: 1s
 
 configs:
-  site:
-    file: web/default.conf.template
-  page:
-    file: web/index.html
-  tokens:
-    file: web/tokens.css
+  glance-config:
+    file: ./glance.yml
 
 x-wonton:
-  spec: "0.6"
-  # 换成你自己的：反向域名形式，装上以后不能改。
-  id: app.example.hello
-  version: 0.1.1
+  spec: "0.12"
+  id: app.github.glanceapp.glance
+  version: 0.1.0
   kind: app
-  title: { zh: 你好, en: Hello }
-  description: { zh: 向登录的人问好的示例网页, en: An example page that greets whoever is signed in }
-  icon: icon.svg
+  title: { zh: 信息面板（Glance）, en: Glance }
+  description:
+    zh: 把天气、日历、新闻和 RSS 放进一个页面
+    en: "Weather, calendar, news and RSS on one page"
+  icon: icon.png
   notices: [NOTICE]
-  screenshots: [screenshots/home.png]
-  author: { name: Example }
-  homepage: https://nginx.org
-  # 应用（这里是 nginx）的许可证；插件包自己的许可证写在仓库的 LICENSE 里。
-  license: BSD-2-Clause
+  screenshots: [screenshots/home.png, screenshots/news.png]
+  author: { name: geraldpeng6, url: https://github.com/geraldpeng6 }
+  homepage: https://github.com/glanceapp/glance
+  # 应用（Glance）的许可证；插件包自己的许可证写在仓库的 LICENSE 里。
+  license: AGPL-3.0-only
   tags:
-    zh: [工具]
-    en: [Tools]
+    zh: [信息面板, 天气, RSS]
+    en: [Dashboard, Weather, RSS]
   about:
     zh: |
-      一个示例网页：登录以后，页面会向你问好。新建插件时可以照着改。
+      一块信息面板：打开一个页面就能看到天气、日历、时间、新闻和 RSS 订阅，像钉在墙上的留言板。打开就用，不用注册登录。
+
+      页面上放什么由你定：默认页有天气（Beijing）、时钟、日历、资讯（少数派、阮一峰的网络日志、36氪、Hacker News）和 GitHub 仓库动态。想换城市或加别的（股票、监控、待办……）就改数据目录里的配置文件，上百种部件见上游文档；云吞的设置页上线后，天气城市等常用项直接在详情页的设置里改。注意：天气城市要用英文写（如“Shanghai, China”），上游按英文名查天气。
     en: |
-      An example page: once you are signed in, the page says hello. Copy it as a starting point for a new plugin.
-  release_notes: { zh: 名字和说明更新。, en: Product name and description update. }
+      An information dashboard: weather, calendar, clock, news and RSS feeds on a single page, like a board on the wall. Open and use, no account needed.
+
+      You decide what's on it: the default page shows weather (Beijing), clock, calendar, news (sspai, Ruanyifeng, 36kr, Hacker News) and GitHub repo activity. Change the city or add other widgets (markets, monitors, todos…) by editing the config files in the data directory; see the upstream docs for all options. Once Wonton's settings page ships, common options like the weather city can be changed in the plugin's settings.
+  release_notes: { zh: 第一版。, en: First release. }
   webui:
-    service: web
-    port: 80
-    # 示例页回显网关注入的用户名，见 https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#网关代登录sso-proxy。
-    sso: proxy
-    proxy:
-      headers:
-        Remote-User: "{user}"
-  # 能放进侧边栏“我的应用”的页面，见 https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#应用页面tabs。放不放由用户决定。
+    service: glance
+    port: 8080
+    # glance 默认没有用户体系；网页始终在云吞网关的登录后面，不再另设账号。
+    sso: none
   tabs:
     - id: home
-      title: { zh: 主页, en: Home }
+      title: { zh: 面板, en: Glance }
       icon: tabs/home.svg
       icon_selected: tabs/home-fill.svg
       path: /
-      # 这个页面没做适配，用默认的 inset：从状态栏下沿开始，页面不用管安全区。
-      # 想让内容从状态栏后面滚过，写 layout: edge-to-edge，并用 --wonton-inset-* 留出系统安全区的位置。
-  permissions: []
-  # 上游 nginx 官方镜像，amd64 和 arm64 都有；上游没写最低内存，按本机空闲实测取整（实测约 24M，取 64M）。
+  settings: settings.schema.json
+  permissions:
+    # 天气（open-meteo）、RSS 源、Hacker News、GitHub 接口都要出网。
+    - network.egress
+  # 上游镜像 amd64 和 arm64 都有（清单列表另有 armv7，不列）；上游没写最低内存，
+  # 本机空闲实测约 60M，取 256M 留余量。
   requirements:
     arch: [amd64, arm64]
-    memory: 64M
+    memory: 256M
