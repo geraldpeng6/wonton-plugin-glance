@@ -35,7 +35,7 @@ data_write() {
   c="$(_container app.github.glanceapp.glance glance)"
   [[ -n "$c" ]] || { echo "找不到 glance 容器"; return 1; }
   marker="wonton-$(_instance)-$RANDOM$RANDOM"
-  docker exec -i "$c" sh -c 'cat >> /app/config/glance.yml' <<YAML
+  docker exec -i "$c" sh -c 'cat >> /app/config/glance.yml' <<YAML || { echo "追加标记页失败"; return 1; }
 
   - name: $marker
     slug: $marker
