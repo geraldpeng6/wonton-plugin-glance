@@ -9,6 +9,7 @@
 #
 # 页面：web_assert 从标准输入读页面，命中的确是应用的真实页面时返回 0。
 # 身份：glance 没有用户体系，网页由云吞网关的会话保护，应用自己不再登录；身份项不适用。
+# 工具：读配置走总线的 read_file；镜像没标 readOnlyHint，总线先弹确认卡，mcp_check 里代批。
 export IDENTITY_NA=1
 export SMOKE_NOTE="glance 没有用户体系，网页由云吞网关登录保护"
 # 数据：glance 的配置即数据。data_write 往数据目录里的 glance.yml 追加一个带随机标记的页面，
@@ -57,4 +58,16 @@ data_check() {
   [[ -n "$marker" ]] || { echo "没有数据标记"; return 1; }
   page="$(dweb "/$marker")" || { echo "打开标记页失败：$page"; return 1; }
   grep -qF "$marker" <<<"$page" || { echo "重装后找不到标记页 $marker：$(head -c 200 <<<"$page")"; return 1; }
+}
+
+mcp_check() { # 总线上有本插件的文件工具，读配置经确认后拿得到内容。
+  # 工具镜像没标 readOnlyHint（上游原样）：总线按敏感处理，先弹确认卡。后台用主人令牌代批，
+  # 验证“确认之后拿得到结果”这整条链；循环 60 秒后自停。
+  local out
+  ( for _ in $(seq 1 30); do probes_dev approve >/dev/null 2>&1 || true; sleep 2; done ) &
+  local approver=$!
+  out="$(probes_dev mcp call "${SMOKE_SLUG}__read_file" '{"path":"glance.yml"}' 2>&1)"
+  kill "$approver" 2>/dev/null || true
+  [[ -n "$out" ]] || { echo "调用没有返回内容"; return 1; }
+  grep -q 'pages:' <<<"$out" || { echo "读到的不是 glance.yml 的内容：$(head -c 300 <<<"$out")"; return 1; }
 }
