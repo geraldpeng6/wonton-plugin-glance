@@ -4,14 +4,15 @@
 # glance 只有文件配置，没有网页设置页：数据目录就是它的配置目录（容器里 /app/config），
 # 主人或 Agent 改里面的 glance.yml 就能换部件；glance 检测到文件变化会自动重载，
 # 检测不可用（inotify 受限）时在详情页停止再启动也一样。
-# 包里的默认配置由一次性服务在首次安装时复制进数据目录，已有不覆盖，用户和 Agent 改过的才能留下。
+# 包里的默认配置由一次性服务在首次安装时复制进数据目录，已有不覆盖，用户和 Agent 改过的才能留下；
+# configs 注入的文件默认 0444，用 install -m 0644 落盘，主人和 Agent 才能改数据目录里的这份。
 # 天气城市等设置经 glance 的 ${ENV} 配置替换生效；核心的设置（wonton-core#242）上线前变量不注入，
 # compose 里 ${VAR:-默认值} 的默认值生效（默认“北京, 中国”）。
 services:
   init:
     image: glanceapp/glance:v0.8.8@sha256:4d7445bc7971836858ffddee5d7501f1efbabb6e694a45b1dde1a789bb1943bb
     user: "${PUID}:${PGID}"
-    entrypoint: ["/bin/sh", "-c", "test -f /data/glance.yml || cp /seed/glance.yml /data/glance.yml"]
+    entrypoint: ["/bin/sh", "-c", "test -f /data/glance.yml || install -m 0644 /seed/glance.yml /data/glance.yml"]
     volumes:
       - ${WONTON_APP_DATA}:/data
     configs:
